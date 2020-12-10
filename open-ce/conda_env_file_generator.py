@@ -8,6 +8,7 @@ disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
 """
 
 import os
+import re
 
 import yaml
 import utils
@@ -27,7 +28,25 @@ class CondaEnvFileGenerator():
         self._external_dependencies = external_dependencies
 
         for build_command in build_commands:
-            self._update_conda_env_file_content(build_command)
+            if build_command.runtime_package:
+                self._update_conda_env_file_content(build_command)
+
+        self._remove_duplicates()
+
+    def _remove_duplicates(self):
+        new_dep_set = set()
+        print("Length of original deps set: ", len(self._dependency_set))
+        for dep in self._dependency_set:
+            py_matched = re.match(r'([\w-]+)([\s=<>]*)(\d[.\d*]*)(.*)', dep)
+            if py_matched:
+                name = py_matched.group(1)
+                if name in new_dep_set:
+                    new_dep_set.remove(name)
+            new_dep_set.add(dep)
+        print("Length of original deps set: ", len(new_dep_set))
+        print("Original list: ", self._dependency_set)
+        print("New list: ", new_dep_set)
+        self._dependency_set = new_dep_set
 
     #pylint: disable=too-many-arguments
     def write_conda_env_file(self,
