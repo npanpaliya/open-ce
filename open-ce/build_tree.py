@@ -8,6 +8,7 @@ disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
 """
 
 import os
+import re
 import utils
 import conda_utils
 import env_config
@@ -284,7 +285,6 @@ class BuildTree(): #pylint: disable=too-many-instance-attributes
             variant_string = utils.variant_string(variant["python"], variant["build_type"],
                                                   variant["mpi_type"], variant["cudatoolkit"])
             self._external_dependencies[variant_string] = external_deps
-            self._conda_env_files[variant_string] = CondaEnvFileGenerator(build_commands, external_deps)
             self._test_commands[variant_string] = test_commands
 
             # Add dependency tree information to the packages list and
@@ -292,6 +292,9 @@ class BuildTree(): #pylint: disable=too-many-instance-attributes
             build_commands = _add_build_command_dependencies(build_commands, self.build_commands,
                                         len(self.build_commands))
             self.build_commands += build_commands
+
+            installable_packages = self.get_installable_packages(variant_string)
+            self._conda_env_files[variant_string] = CondaEnvFileGenerator(installable_packages)
         self._detect_cycle()
 
     def _get_repo(self, env_config_data, package):
@@ -446,6 +449,65 @@ class BuildTree(): #pylint: disable=too-many-instance-attributes
                                               variant["mpi_type"], variant["cudatoolkit"])
         return self._external_dependencies.get(variant_string, [])
 
+    def get_installable_packages(self, variant_str):
+        installable_packages =  set()
+
+        def check_matching(deps_set, dep_to_be_added):
+            if dep_to_be_added in deps_set:
+                print("Return None for: ", dep_to_be_added)
+                return None
+
+            dep_name = dep_to_be_added.split()[0]
+            if dep_name in deps_set and len(dep_to_be_added.split()) > 1:
+                print("#2 Return dep_to_be_added for: ", dep_to_be_added)
+                deps_set.remove(dep_name)
+                return dep_to_be_added
+          
+            for dep in deps_set:
+                dep_name_from_set = dep.split()[0]
+                if dep_to_be_added == dep_name_from_set:
+                    print("#3 Return dep for: ", dep)
+                    return dep
+                elif dep_name == dep_name_from_set:
+                    print("#4 Return None for: ", dep_to_be_added)
+                    return None
+
+            print("#5 Return dep_to_be_added for: ", dep_to_be_added)
+            return dep_to_be_added
+
+        def _update_dep_names(dependencies):
+            deps = set()
+            if not dependencies is None:
+                for dep in dependencies:
+                    generalized_dep = utils.generalize_version(dep)
+                    print("Each generalized dep: ", generalized_dep)
+                    dep_to_update = check_matching(deps, generalized_dep)
+                    if dep_to_update:
+                        deps.add(dep_to_update)
+            return deps
+
+        def check_and_add(dependencies, parent_set):
+            print("Raw deps: ", dependencies)
+            dependencies = _update_dep_names(dependencies)
+            print("Unique and generalized deps: ", dependencies)
+
+            for dep in dependencies:
+                pack_to_add = check_matching(parent_set, dep)
+                if pack_to_add:
+                    parent_set.add(pack_to_add)
+
+            print("Parent set: ", parent_set)
+            return parent_set
+            
+        for build_command in self.build_commands:
+            if build_command.runtime_package:
+                installable_packages = check_and_add(build_command.run_dependencies, installable_packages)
+                installable_packages = check_and_add(build_command.packages, installable_packages)
+
+        installable_packages = check_and_add(self._external_dependencies[variant_str], installable_packages)
+        print("Lenght of final installable packages: ", len(installable_packages))
+        return installable_packages
+
     def write_conda_env_files(self,
                               channels=None,
                               output_folder=None,
@@ -481,6 +543,59 @@ class BuildTree(): #pylint: disable=too-many-instance-attributes
             if len(cycles) > max_cycles:
                 cycle_print += "\nCycles truncated after {}...".format(max_cycles)
             raise OpenCEError(Error.BUILD_TREE_CYCLE, cycle_print)
+
+def remove_duplicates(packages):
+    half_packs1 = set()
+    half_packs2 = set()
+    print("Length of original deps set: ", len(packages))
+    count = len(packages)
+    index = 1
+    for pack in packages:
+        if index <= count/2:
+            half_packs1.add(pack)
+        else:
+            half_packs2.add(pack)
+        
+        index += 1
+
+    print("Length of 1st half pack set: ", len(half_packs1))
+    print("Length of 2nd half pack set: ", len(half_packs2))
+    for pack in half_packs1:
+        print("1st half packages: ", pack)
+    for pack in half_packs2:
+        print("2nd half packages: ", pack)
+
+    new_dep_list = set()
+    for pack1 in half_packs1:
+        if pack1 in half_packs2:
+            half_packs2.remove(pack1)
+            new_dep_list.add(pack1)
+        else:
+            pack1_name = pack1.split()[0]
+            if pack1_name in half_packs2:
+                half_packs2.remove(pack1_name)                
+                new_dep_list.add(pack1)
+            else:
+                pack2_items_to_be_removed = list()
+                added = False
+                for pack2 in half_packs2:
+                    pack2_name = pack2.split()[0]
+                    if pack1_name == pack2_name:
+                        if not added:
+                            new_dep_list.add(pack2)
+                            added = True
+                        pack2_items_to_be_removed.append(pack2)
+                if not added:
+                    new_dep_list.add(pack1)                    
+                for pack2 in pack2_items_to_be_removed:
+                    half_packs2.remove(pack2)
+
+    new_dep_list.update(half_packs2) 
+    print("Length of new dep set: ", len(new_dep_list))
+    for dep in new_dep_list:
+        print("New list: ", dep)
+
+    return new_dep_list
 
 def find_all_cycles(tree, current=0, seen=None):
     '''

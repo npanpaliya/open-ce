@@ -8,7 +8,6 @@ disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
 """
 
 import os
-import re
 
 import yaml
 import utils
@@ -21,32 +20,9 @@ class CondaEnvFileGenerator():
     """
 
     def __init__(self,
-                 build_commands,
-                 external_dependencies,
+                 dependencies,
                  ):
-        self._dependency_set = set()
-        self._external_dependencies = external_dependencies
-
-        for build_command in build_commands:
-            if build_command.runtime_package:
-                self._update_conda_env_file_content(build_command)
-
-        self._remove_duplicates()
-
-    def _remove_duplicates(self):
-        new_dep_set = set()
-        print("Length of original deps set: ", len(self._dependency_set))
-        for dep in self._dependency_set:
-            py_matched = re.match(r'([\w-]+)([\s=<>]*)(\d[.\d*]*)(.*)', dep)
-            if py_matched:
-                name = py_matched.group(1)
-                if name in new_dep_set:
-                    new_dep_set.remove(name)
-            new_dep_set.add(dep)
-        print("Length of original deps set: ", len(new_dep_set))
-        print("Original list: ", self._dependency_set)
-        print("New list: ", new_dep_set)
-        self._dependency_set = new_dep_set
+        self._dependency_set = dependencies
 
     #pylint: disable=too-many-arguments
     def write_conda_env_file(self,
@@ -82,21 +58,6 @@ class CondaEnvFileGenerator():
             file_name = conda_env_file
 
         return file_name
-
-    def _update_deps_lists(self, dependencies):
-        if not dependencies is None:
-            for dep in dependencies:
-                self._dependency_set.add(utils.generalize_version(dep))
-
-    def _update_conda_env_file_content(self, build_command):
-        """
-        This function updates dependency dictionary for each build command with
-        its dependencies both internal and external.
-        """
-        self._update_deps_lists(build_command.run_dependencies)
-        self._update_deps_lists(build_command.packages)
-
-        self._update_deps_lists(self._external_dependencies)
 
 def get_variant_string(conda_env_file):
     """
