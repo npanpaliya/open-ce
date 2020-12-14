@@ -453,50 +453,45 @@ class BuildTree(): #pylint: disable=too-many-instance-attributes
         installable_packages =  set()
 
         def check_matching(deps_set, dep_to_be_added):
+            # If exact match already present in the set, no need to add again
             if dep_to_be_added in deps_set:
-                print("Return None for: ", dep_to_be_added)
                 return None
 
-            dep_name = dep_to_be_added.split()[0]
-            if dep_name in deps_set and len(dep_to_be_added.split()) > 1:
-                print("#2 Return dep_to_be_added for: ", dep_to_be_added)
-                deps_set.remove(dep_name)
+            # Check only dependency name if it is present
+            # For e.g. If dep_to_be_added is tensorflow-base >=2.4.* and set has tensorflow-base
+            dep_name_to_be_added = dep_to_be_added.split()[0]
+            if dep_name_to_be_added in deps_set and len(dep_to_be_added.split()) > 1:
+                deps_set.remove(dep_name_to_be_added)
                 return dep_to_be_added
-          
+
+            # For e.g. If set has tensorflow-base 2.4.* and dep_to_be_added is 
+            # either just tensorflow-base or tensorflow-base >=2.4.*
             for dep in deps_set:
                 dep_name_from_set = dep.split()[0]
-                if dep_to_be_added == dep_name_from_set:
-                    print("#3 Return dep for: ", dep)
-                    return dep
-                elif dep_name == dep_name_from_set:
-                    print("#4 Return None for: ", dep_to_be_added)
+                if dep_name_to_be_added == dep_name_from_set:
                     return None
 
-            print("#5 Return dep_to_be_added for: ", dep_to_be_added)
+            # If no match found, just add it
             return dep_to_be_added
 
-        def _update_dep_names(dependencies):
+        def _get_unique_deps_names(dependencies):
             deps = set()
             if not dependencies is None:
                 for dep in dependencies:
                     generalized_dep = utils.generalize_version(dep)
-                    print("Each generalized dep: ", generalized_dep)
                     dep_to_update = check_matching(deps, generalized_dep)
                     if dep_to_update:
                         deps.add(dep_to_update)
             return deps
 
         def check_and_add(dependencies, parent_set):
-            print("Raw deps: ", dependencies)
-            dependencies = _update_dep_names(dependencies)
-            print("Unique and generalized deps: ", dependencies)
+            dependencies = _get_unique_deps_names(dependencies)
 
             for dep in dependencies:
                 pack_to_add = check_matching(parent_set, dep)
                 if pack_to_add:
                     parent_set.add(pack_to_add)
 
-            print("Parent set: ", parent_set)
             return parent_set
             
         for build_command in self.build_commands:
