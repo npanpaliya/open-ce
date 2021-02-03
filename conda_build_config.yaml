@@ -214,7 +214,7 @@ tensorboard_plugin_wit:
 tensorflow:
   - 2.4.*
 tensorflow_hub:
-  - 0.10
+  - 0.11
 tensorrt:
   - 7.0.*                    # [cudatoolkit == '10.2']
   - 7.2.*                    # [cudatoolkit == '11.0']
