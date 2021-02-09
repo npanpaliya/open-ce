@@ -109,6 +109,7 @@ def build_env(args):
                                git_tag_for_env=args.git_tag_for_env,
                                conda_build_config=args.conda_build_config)
 
+    print("Build Tree cuda versions: ", build_tree.get_cuda_versions())
     # Generate conda environment files
     conda_env_files = build_tree.write_conda_env_files(output_folder=os.path.abspath(args.output_folder),
                                                        path=os.path.abspath(args.output_folder))
