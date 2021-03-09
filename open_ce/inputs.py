@@ -21,6 +21,7 @@ import os
 import argparse
 from enum import Enum, unique
 from open_ce import utils
+from open_ce.errors import OpenCEError, Error
 
 class OpenCEFormatter(argparse.ArgumentDefaultsHelpFormatter):
     """
@@ -243,20 +244,30 @@ def parse_args(parser, arg_strings=None):
                           the local path.
     '''
     args = parser.parse_args(arg_strings)
-
     if "conda_build_config" in vars(args).keys():
+        found_valid_config_file = True
         if args.conda_build_config is None:
             if "env_config_file" in vars(args).keys() and args.env_config_file:
                 args.conda_build_config = os.path.join(os.path.dirname(args.env_config_file[0]),
                                                        utils.CONDA_BUILD_CONFIG_FILE)
             else:
                 args.conda_build_config = utils.DEFAULT_CONDA_BUILD_CONFIG
+                if args.conda_build_config is None:
+                    found_valid_config_file = False
 
-        if utils.is_url(args.conda_build_config):
-            args.conda_build_config = utils.download_file(args.conda_build_config,
+        if found_valid_config_file:
+            if utils.is_url(args.conda_build_config):
+                args.conda_build_config = utils.download_file(args.conda_build_config,
                                                           filename=utils.CONDA_BUILD_CONFIG_FILE)
+            else:
+                print("Found in check4")
+                args.conda_build_config = os.path.abspath(args.conda_build_config)
+
         else:
-            args.conda_build_config = os.path.abspath(args.conda_build_config)
+            raise OpenCEError(Error.CONDA_BUILD_CONFIG_FILE_NOT_FOUND)
+
+        #if not utils.is_url(args.conda_build_config) and not os.path.exists(args.conda_build_config):
+        #    raise OpenCEError(Error.CONDA_BUILD_CONFIG_FILE_NOT_FOUND, args.conda_build_config)
 
     return args
 

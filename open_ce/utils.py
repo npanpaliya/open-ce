@@ -34,7 +34,14 @@ DEFAULT_PYTHON_VERS = "3.7"
 DEFAULT_MPI_TYPES = "openmpi"
 DEFAULT_CUDA_VERS = "10.2"
 CONDA_BUILD_CONFIG_FILE = "conda_build_config.yaml"
-DEFAULT_CONDA_BUILD_CONFIG = os.path.abspath(os.path.join(os.getcwd(), CONDA_BUILD_CONFIG_FILE))
+DEFAULT_CONDA_BUILD_CONFIG_PATHS = [os.path.abspath(os.path.join(os.getcwd(),
+                                             "open-ce-environments", "envs",
+                                             CONDA_BUILD_CONFIG_FILE)), 
+                                    os.path.abspath(os.path.join(os.getcwd(), "..",
+                                             "open-ce-environments", "envs",
+                                             CONDA_BUILD_CONFIG_FILE))]
+
+DEFAULT_CONDA_BUILD_CONFIG = next(filter(lambda path: os.path.exists(path), DEFAULT_CONDA_BUILD_CONFIG_PATHS), None)
 DEFAULT_GIT_LOCATION = "https://github.com/open-ce"
 SUPPORTED_GIT_PROTOCOLS = ["https:", "http:", "git@"]
 DEFAULT_RECIPE_CONFIG_FILE = "config/build-config.yaml"
@@ -236,7 +243,7 @@ def is_url(to_check):
     '''
     Determines if a string is a URL
     '''
-    return to_check.startswith("http:") or to_check.startswith("https:")
+    return to_check and (to_check.startswith("http:") or to_check.startswith("https:"))
 
 def download_file(url, filename=None):
     '''
